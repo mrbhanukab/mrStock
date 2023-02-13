@@ -4,11 +4,12 @@ import asyncio
 import telegram
 
 
-async def send_message(ticker, company_name, latest_update, closing_price, previous_close):
+async def send_message(ticker, company_name, latest_update, closing_price, previous_close, intradaychange):
     bot = telegram.Bot(token="5970479672:AAH17INZd_4NvnrIj221zZzUSwk7kOxpp6M")
     chat_id = "962648693"
-    message = f"Company Name: {company_name}\nTicker: {ticker}\nLatest Update: {latest_update}\nClosing Price: {closing_price}\nPrevious Close: {previous_close}"
-    await bot.send_message(chat_id=chat_id, text=message)
+    message = f"<b><u>{company_name} | {ticker}</u></b>\n\n<i>⌛ {latest_update}</i>\n\n<b>Closing Price:</b> {closing_price}\n<b>Previous Close:</b> {previous_close}\n<b>Intra-Day Change:</b> {intradaychange}\n"
+    message += "\n<b><a href='https://www.marketwatch.com/investing/stock/{}/charts?countrycode=lk&mod=mw_quote_advanced'>View Advance Chart 📊</a></b>".format(ticker)
+    await bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
 def get_data(ticker):
     url = f"https://www.marketwatch.com/investing/stock/{ticker}?countrycode=lk"
@@ -27,15 +28,26 @@ def get_data(ticker):
     previous_close_el = soup.select_one("td.u-semi")
     previous_close = previous_close_el.text.strip()
 
-    return company_name, latest_update, closing_price, previous_close
+    intraday_change_el = soup.select_one("bg-quote.intraday__change")
+    if intraday_change_el is not None:
+        change_percent_el = intraday_change_el.select_one("span.change--percent--q")
+        change_percent = change_percent_el.text.strip()
+        if "positive" in intraday_change_el["class"]:
+            intradaychange = f"📈 {change_percent}"
+        else:
+            intradaychange = f"📉 {change_percent}"
+    else:
+        intradaychange = "N/A"
+
+    return company_name, latest_update, closing_price, previous_close, intradaychange
 
 async def main():
     tickers = ["odel.n0000", "ahpl.n0000"]
     tasks = []
     for ticker in tickers:
         data = get_data(ticker)
-        company_name, latest_update, closing_price, previous_close = data
-        task = asyncio.create_task(send_message(ticker, company_name, latest_update, closing_price, previous_close))
+        company_name, latest_update, closing_price, previous_close, intradaychange = data
+        task = asyncio.create_task(send_message(ticker, company_name, latest_update, closing_price, previous_close, intradaychange))
         tasks.append(task)
 
     await asyncio.gather(*tasks)
